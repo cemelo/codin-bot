@@ -1,8 +1,8 @@
 
 require 'cinch'
-require_relative 'lib/plugins'
+require 'lib/plugins'
 
-require_relative 'config'
+require 'config'
 
 bot = Cinch::Bot.new do
   configure do |config|

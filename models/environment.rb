@@ -1,128 +1,154 @@
 
 require 'fileutils'
-require 'open4'
+require 'open3'
+require 'logger'
+require 'models/configuration'
 
 module CodinBot
 	class Environment
 		
-		attr_accessor :description
+		def initialize(&block)
+			@config = Configuration::Environment.new
+			instance_eval &block if block_given?
+		end
 
-		attr_accessor :repo_url
-		attr_accessor :repo_dir
-		
-		attr_accessor :base_project
-		attr_accessor :package
-		attr_accessor :contexts
-
-		attr_accessor :deploy_server
-		attr_accessor :remote_deploy_dir
-		attr_accessor :local_deploy_dir
+		def configure(&block)
+			yield(@config) if block_given?
+		end
 
 		#
 		# SVN Functions
 		#
+
+		def repo_dir
+			@config.repo_dir
+		end
 
 		def revert(username, password)
 			at_revision = -1
 
 			command = "svn sw --non-interactive --force " <<
 				"--username #{username} --password #{password} " <<
-				"#{@repo_url} #{@repo_dir}"
+				"#{@config.repo_url} #{@config.repo_dir}"
 
-			proc = Open4::popen4(command) do |pid, stdin, stdout, stderr|
-				line = stdout.read.strip
-				if (line =~ /.*revision.*\s([0-9]+)\./i)
-					at_revision = line.scan(/.*revision.*\s([0-9]+)\./i).last[0]
-				end
+			output, proc = Open3.capture2e(command)
+
+			if output =~ /.*authorization failed.*/i
+				raise 'Authorization failed'
+			end
+
+			if output =~ /.*revision.*\s([0-9]+)\./i
+				at_revision = output.scan(/.*revision.*\s([0-9]+)\./i).last[0]
 			end
 
 			if proc.exitstatus != 0
-				raise 'Revert process exited abnormaly'
+				raise 'Unknown error'
 			end
 
 			at_revision.to_s
 		end
 
-		def checkout(username, password, *revision)
+		def checkout(username, password, revision)
 			at_revision = -1
 
-			revision[0] ||= "'HEAD'"
+			revision ||= "'HEAD'"
 
 			command = "svn checkout --non-interactive --force " <<
 				"--username #{username} --password #{password} " <<
-				"--revision #{revision[0]} " <<
-				"#{@repo_url} #{@repo_dir}"
+				"--revision #{revision} " <<
+				"#{@config.repo_url} #{@config.repo_dir}"
 
-			puts "hello2"
+			puts command
+			output, proc = Open3.capture2e(command)
 
-			proc = Open4::popen4(command) do |pid, stdin, stdout, stderr|
-				line = stdout.read.strip
-				if (line =~ /.*revision.*\s([0-9]+)\./i)
-					at_revision = line.scan(/.*revision.*\s([0-9]+)\./i).last[0]
-				end
-
-				puts "hello"
-				puts stderr.read.strip
+			if output =~ /.*authorization failed.*/i
+				raise 'Authorization failed'
 			end
 
+			if (output =~ /.*revision.*\s([0-9]+)\./i)
+				at_revision = output.scan(/.*revision.*\s([0-9]+)\./i).last[0]
+			end
+
+			puts output
+
 			if proc.exitstatus != 0
-				raise 'Checkout process exited abnormaly'
+				raise 'Unknown error'
 			end
 
 			at_revision.to_s
 		end
 
 		def remove
-			FileUtils.rm_r File.join('.', @repo_dir)
+			FileUtils.rm_r File.join('.', @config.repo_dir)
 		end
 
 		#
 		# Build & Deploy
 		#
 
-		def build(username, password)
+		def build
 			command = "ant cleanall deploy"
 
-			Dir.chdir File.join(@repo_dir, @base_project) do
-				proc = Open4::popen4(command) {}
+			if not File.directory?(@config.local_deploy_dir)
+				FileUtils.mkdir_p @config.local_deploy_dir
+			end
 
-				if proc.exitstatus != 0
-					raise 'Build failed'
-				end
+			output, proc = Open3.capture2e(@config.build_env, command,
+				{ :chdir => File.join(@config.repo_dir, @config.base_project) })
 
-				@contexts.each do |k, c|
-					`unzip -q #{@package} -d /tmp/build-#{c[:context]}`
+			if proc.exitstatus != 0
+				raise 'Build failed'
+			end
+
+			FileUtils.cp_r File.join(@config.repo_dir, @config.base_project,
+				'build', @config.package), @config.local_deploy_dir
+
+			@config.contexts.each do |k, c|
+				`unzip -q #{File.join(@config.local_deploy_dir, @config.package)} \
+				-d /tmp/build-#{c[:context]}`
+
+				raise "Build failed" if $? != 0
+
+				Dir.chdir "/tmp/build-#{c[:context]}" do
+					xml = File.read('META-INF/application.xml')
+					xml.gsub! /<context-root>.*<\/context-root>/i,
+						"<context-root>#{c[:context]}<\/context-root>"
+					
+					File.open('META-INF/application.xml', 'w') do |file|
+						file.puts xml
+					end
+
+					`zip -q -r ../#{c[:package]} . -i *`
 
 					raise "Build failed" if $? != 0
 
-					Dir.chdir "/tmp/build-#{c[:context]}" do
-						xml = File.read(File.join(@base_project,
-							'EarContent/META-INF/application.xml'))
-						xml.gsub! /<context-root>.*<\/context-root>/i,
-							"<context-root>#{c[:context]}<\/context-root>"
-						
-						File.open(File.join(@base_project,
-							'EarContent/META-INF/application.xml'), 'w') do |file|
-							file.puts xml
-						end
+				end # Dir.chdir
 
-						`zip -q -r ../#{c[:package]} . -i *`
+				FileUtils.cp_r File.join('/tmp', c[:package]), @config.local_deploy_dir
 
-						raise "Build failed" if $? != 0
-
-					end # Dir.chdir
-
-					FileUtils.cp_r File.join('/tmp', c.package), @local_deploy_dir
-
-					FileUtils.rm_r "/tmp/build-#{c[:context]}"
-					FileUtils.rm_r "/tmp/#{c[:package]}"
-				end # contexts.each
-			end # Dir.chdir
-
+				FileUtils.rm_r "/tmp/build-#{c[:context]}"
+				FileUtils.rm_r "/tmp/#{c[:package]}"
+			end # contexts.each
 		end
 
-		def deploy(username, password, svn_password)
-		end
+		def deploy(username, password, *environment)
+			exitstatus = -1
 
+			environment = environment[0] || @config
+
+			Open3.popen2e("smbclient #{environment.deploy_server} -U sof/#{username}%#{password}",
+				:chdir => environment.local_deploy_dir) do |i, o, w|
+				
+				i.puts "PUT #{environment.package} #{environment.remote_deploy_dir}\\#{environment.package}"
+				environment.contexts.each do |k, c|
+					i.puts "PUT #{c[:package]}\\#{c[:remote_deploy_dir]}\\#{c[:package]}"
+				end
+				i.close
+
+				exitstatus = w.value
+			end
+
+			raise 'Deploy failed' if exitstatus != 0
+		end
 	end # class
 end # module

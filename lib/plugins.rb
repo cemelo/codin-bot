@@ -16,5 +16,5 @@ module Cinch::Helpers
 end
 
 module CodinBot
-	require_relative 'plugins/svn_commands'
+	require 'lib/plugins/svn_commands'
 end

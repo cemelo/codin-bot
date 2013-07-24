@@ -6,3 +6,8 @@ task :test => [] do
 	require 'test/unit'
 	require 'test/tc_environment'
 end
+
+desc "Run"
+task :default => [] do
+	require 'bot'
+end

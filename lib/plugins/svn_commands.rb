@@ -1,33 +1,45 @@
 require 'cinch'
-require_relative '../svn'
 
 class CodinBot::SVNCommands
 	include Cinch::Plugin
-	include CodinBot::SVN
 	
 	match /svn ajuda$/i, :method => :help
 	match /svn ajuda (.+)$/i, :method => :help_command
 
 	match /svn lista$/i, :method => :list
-	match /svn remover(\s(.+))$/i, :method => :remove
-	match /svn reverter(\s(.+) (.+))?$/i, :method => :revert
-	match /svn obter((\s[a-z]+)$|(\s[a-z]+){2}$|\s(.+)\s(.+)\s(.+)$)?/i, :method => :checkout
+	
+	match /svn remover$/i, :method => :remove
+	match /svn remover ([[:graph:]]+)$/i, :method => :remove
+	
+	match /svn (reverter|reverter [[:graph:]]+)$/i, :method => :revert
+	match /svn reverter ([[:graph:]]+) \"(.+)\"$/i, :method => :revert
+
+	match /svn obter$/i, :method => :checkout
+	match /svn obter ([[:graph:]]+)$/i, :method => :checkout
+	match /svn obter ([[:graph:]]+) \"(.+)\"$/i, :method => :checkout
+	match /svn obter ([[:graph:]]+) \"(.+)\" (HEAD|[0-9]+)$/i, :method => :checkout
+	#match /svn obter ([[:graph:]]+) (\".+\"|[[:graph:]]+) ([[:graph:]]+)$/i, :method => :checkout
 
 	def list(m)
 		m.reply Format(:grey, "Lista de ramos disponíveis:")
 
 		config.each do |k|
-			m.reply Format(:grey, "    - " << k)
+			m.reply Format(:grey, "    - " << k[0].to_s)
 		end
 	end
 
-	def remove(m, match, branch)
+	def remove(m, *args)
 		return m.reply Format(:grey, "Sintaxe: %s" %
-			Format(:bold, "!svn remover <ramo>")) if not match
+			Format(:bold, "!svn remover <ramo>")) if args.nil? or args.length < 1
+
+		branch = args[0]
+
+		return m.reply Format(:grey, "Ramo não %s existe." %
+			Format(:bold, :blue, branch)) if config[branch.to_sym].nil?
 
 		begin
 			branch.strip!
-			Remove(config[branch.to_sym][:dir])
+			config[branch.to_sym].remove
 			
 			m.reply Format(:grey, "Diretório do ramo %s removido." %
 				Format(:bold, :blue, branch))
@@ -38,37 +50,54 @@ class CodinBot::SVNCommands
 		end
 	end
 
-	def revert(m, match, branch, password)
+	def revert(m, *args)
 		return m.reply Format(:grey, "Sintaxe: %s" %
-			Format(:bold, "!svn reverter <ramo> <senha>")) if not match
+			Format(:bold, "!svn reverter <ramo> <senha>")) if args.nil? or
+				args.length < 3
+
+		branch = args[0]
+		password = args[1]
+
+		return m.reply Format(:grey, "Ramo não %s existe." %
+			Format(:bold, :blue, branch)) if config[branch.to_sym].nil?
 
 		m.reply Format(:grey, "Revertendo alterações no ramo %s." %
 			Format(:bold, :blue, branch))
 
 		begin
-			@revision = Revert(config[branch.to_sym][:url],
-				config[branch.to_sym][:dir],
-				m.user.nick, password)
+			@revision = config[branch.to_sym].revert(m.user.nick, password)
 
 			m.reply Format(:grey,
 				"Cópia local do ramo %s revertida para a revisão %s." %	[
 					Format(:bold, :blue, branch),
 					Format(:bold, :blue, @revision.to_s)])
-		rescue
-			m.reply Format(:grey,
-				"%s: cópia local do ramo %s não existe." %
-				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+		rescue Exception => e
+			if e.message == 'Authorization failed'
+				m.reply Format(:grey,
+					"%s: acesso negado ao ramo %s. Verifique seu nome de usuário e senha." %
+					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+			else
+				m.reply Format(:grey,
+					"%s: cópia local do ramo %s não existe." %
+					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+			end
 		end
 	end
 
-	def checkout(m, *args, branch, password, revision)
-		puts args.inspect
-		return m.reply Format(:grey, "Sintaxe: %s" %
-			Format(:bold, "!svn obter <ramo> <senha>")) if password.nil?
+	def checkout(m, *args)
+		if args.length < 2 or args.length > 3
+			return m.reply Format(:grey, "Sintaxe: %s" %
+				Format(:bold, "!svn obter <ramo> <senha> [<revisão>]"))
+		end
 
-		return
+		branch = args[0]
+		password = args[1]
+		revision = args[2]
+
+		return m.reply Format(:grey, "Ramo não %s existe." %
+			Format(:bold, :blue, branch)) if config[branch.to_sym].nil?
 		
-		if File.directory? config[branch.to_sym][:dir]
+		if File.directory? config[branch.to_sym].repo_dir
 			m.reply Format(:grey, "Atualizando cópia local do ramo %s." %
 				Format(:bold, :blue, branch))
 		else
@@ -77,18 +106,24 @@ class CodinBot::SVNCommands
 		end
 
 		begin
-			@revision = Checkout(config[branch.to_sym][:url],
-					config[branch.to_sym][:dir],
-					m.user.nick, password, revision)
+			@revision = config[branch.to_sym].checkout(m.user.nick, password,
+				revision)
 
 			m.reply Format(:grey,
 				"Criada cópia local da revisão %s do ramo %s." %	[
 					Format(:bold, :blue, @revision.to_s),
 					Format(:bold, :blue, branch)])
-		rescue
-			m.reply Format(:grey,
-				"%s: não foi possível criar cópia local do ramo %s." %
-				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+		rescue Exception => e
+			puts e.message
+			if e.message == 'Authorization failed'
+				m.reply Format(:grey,
+					"%s: acesso negado ao ramo %s. Verifique seu nome de usuário e senha." %
+					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+			else
+				m.reply Format(:grey,
+					"%s: não foi possível criar cópia local do ramo %s." %
+					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+			end
 		end
 	end
 
@@ -156,6 +191,9 @@ class CodinBot::SVNCommands
 					ser utilizado sempre que houver algum problema com a cópia local que não
 					possa ser solucionada através do comando %s.\n} % 
 						[Format(:bold, :blue, "REVERTER")])
+		else
+			m.reply Format(:grey, "Comando %s não suportado.\n" %
+				[Format(:bold, :blue, command)])
 		end
 	end
 end # class

@@ -8,10 +8,13 @@ class CodinBot::BuildCommands
 	match /build ajuda$/i, :method => :help
 	match /build ajuda (.+)$/i, :method => :help_command
 
-	match /build compilar(\s(.+))$/i, :method => :compile
-	match /build implantar(\s(.+) (.+) (.+))?$/i, :method => :deploy
+	match /build compilar$/i, :method => :compile
+	match /build compilar ([[:graph:]]+)$/i, :method => :compile
+	match /build compilar ([[:graph:]]+) \"(.+)\"$/i, :method => :compile
 
-	def build(m, match, target)
+	match /build implantar$/i, :method => :deploy
+
+	def build(m, target, password)
 		return m.reply Format(:grey, "Sintaxe: %s" %
 			Format(:bold, "!svn compilar <ambiente>")) if not match
 
@@ -28,109 +31,55 @@ class CodinBot::BuildCommands
 		end
 	end
 
-	def revert(m, match, branch, password)
-		return m.reply Format(:grey, "Sintaxe: %s" %
-			Format(:bold, "!svn reverter <ramo> <senha>")) if not match
-
-		m.reply Format(:grey, "Revertendo alterações no ramo %s." %
-			Format(:bold, :blue, branch))
-
-		begin
-			@revision = Revert(config[branch.to_sym][:url],
-				config[branch.to_sym][:dir],
-				m.user.nick, password)
-
-			m.reply Format(:grey,
-				"Cópia local do ramo %s revertida para a revisão %s." %	[
-					Format(:bold, :blue, branch),
-					Format(:bold, :blue, @revision.to_s)])
-		rescue
-			m.reply Format(:grey,
-				"%s: cópia local do ramo %s não existe." %
-				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
-		end
-	end
-
-	def checkout(m, *args, branch, password, revision)
-		puts args.inspect
-		return m.reply Format(:grey, "Sintaxe: %s" %
-			Format(:bold, "!svn obter <ramo> <senha>")) if password.nil?
-
-		return
-		
-		if File.directory? config[branch.to_sym][:dir]
-			m.reply Format(:grey, "Atualizando cópia local do ramo %s." %
-				Format(:bold, :blue, branch))
-		else
-			m.reply Format(:grey, "Criando cópia local do ramo %s. Aguarde..." %
-				Format(:bold, :blue, branch))
-		end
-
-		begin
-			@revision = Checkout(config[branch.to_sym][:url],
-					config[branch.to_sym][:dir],
-					m.user.nick, password, revision)
-
-			m.reply Format(:grey,
-				"Criada cópia local da revisão %s do ramo %s." %	[
-					Format(:bold, :blue, @revision.to_s),
-					Format(:bold, :blue, branch)])
-		rescue
-			m.reply Format(:grey,
-				"%s: não foi possível criar cópia local do ramo %s." %
-				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
-		end
-	end
-
 	def help(m)
 		m.reply Format(:grey,
-			%Q{O prefixo %s oferece comandos de controle sobre a cópia
-				do código-fonte no servidor; para utilizá-los, digite
-				%s em qualquer janela. Para obter	ajuda com relação a um
-				comando específico, digite %s.} % [
-				Format(:bold, :blue, "!svn"),
-				Format(:bold, :blue, "!svn <comando>"),
-				Format(:bold, :blue, "!svn ajuda <comando>")])
+			%Q{O prefixo %s oferece comandos de controle sobre a criação
+				e implantação de pacotes a partir da cópia local do código-fonte;
+				para utilizá-los, digite %s em qualquer janela. Para obter
+				ajuda com relação a um comando específico, digite %s.
+				Segue abaixo a lista de comandos suportados:} % [
+				Format(:bold, :blue, "!build"),
+				Format(:bold, :blue, "!build <comando>"),
+				Format(:bold, :blue, "!build ajuda <comando>")])
 		
 		m.reply " "
 		m.reply "    " << Format(:grey,
-			"LISTA     Exibe uma lista com os ramos disponíveis")
+			"LISTA      Exibe uma lista com os ambientes disponíveis")
 		m.reply "    " << Format(:grey,
-			"OBTER     Obtém a última revisão de um ramo específico")
+			"COMPILAR   Compila a última revisão do ambiente solicitado")
 		m.reply "    " << Format(:grey,
-			"REVERTER  Reverte quaisquer alterações feitas no diretório de trabalho")
-		m.reply "    " << Format(:grey,
-			"REMOVER   Remove o diretório de trabalho de um ramo específico")
+			"IMPLANTAR  Implanta o pacote gerado pela compilação no servidor")
 	end
 
 	def help_command(m, command)
 		case command
 		when /lista/i
-			m.reply Format(:grey, "Sintaxe: %s\n" % [Format(:bold, :blue, "!SVN LISTA")])
+			m.reply Format(:grey, "Sintaxe: %s\n" % [Format(:bold, :blue, "!BUILD LISTA")])
 			m.reply Format(:grey,
-				%Q{Este comando exibe uma lista com os ramos disponíveis.})
+				%Q{Este comando exibe uma lista com os ambientes disponíveis.})
 		when /obter/i
 			m.reply Format(:grey, "Sintaxe: %s\n" %
-				[Format(:bold, :blue, "!SVN OBTER <ramo> <senha> [<revisao>]")])
+				[Format(:bold, :blue, "!BUILD COMPILAR <ambiente> <senha>")])
 			m.reply Format(:grey,
-				%Q{Este comando cria ou atualiza a cópia local do código-fonte no
-					servidor. Deve ser chamado sempre que um ramo novo for criado no
-					SVN, ou quando houver a remoção da cópia local de um ramo, ou quando
-					se desejar utilizar uma revisão específica.})
+				%Q{Este comando compila a última versão do código-fonte disponível no
+					repositório. Sempre que este comando é chamado, o código é atualizado
+					para a última revisão antes de a compilação se iniciar.})
 			m.reply Format(:grey,
 				%Q{%s! Este comando necessita de informações de autenticação.
 					Assim, para executá-lo, utilize uma conversa privada com %s.
 					Para isso, digite %s.\n} % [
 					Format(:bold, "Atenção"),
 					Format(:bold, :blue, bot.nick),
-					Format(:bold, :blue, "/msg #{bot.nick} !svn <comando>")])
+					Format(:bold, :blue, "/msg #{bot.nick} !build <comando>")])
 		when /reverter/i
 			m.reply Format(:grey, "Sintaxe: %s\n" %
-				[Format(:bold, :blue, "!SVN REVERTER <ramo> <senha>")])
+				[Format(:bold, :blue, "!BUILD IMPLANTAR <ambiente> [em <ambiente>] \"<senha>\"")])
 			m.reply Format(:grey,
-				%Q{Este comando reverte alterações na cópia local do código-fonte no
-					servidor. Não tem muito uso prático pois sempre é chamado antes de
-					uma compilação de código.})
+				%Q{Este compila e implanta o pacote gerado no servidor do ambiente
+					selecionado. Antes de iniciar a compilação, a cópia local do código
+					é atualizada para a última revisão. Opcionalmente, pode-se gerar um
+					pacote de um ambiente e implantá-la em outro ambiente utilizando-se
+					do argumento "em".})
 			m.reply Format(:grey,
 				%Q{%s! Este comando necessita de informações de autenticação.
 					Assim, para executá-lo, utilize uma conversa privada com %s.
@@ -138,14 +87,8 @@ class CodinBot::BuildCommands
 					Format(:bold, "Atenção"),
 					Format(:bold, :blue, bot.nick),
 					Format(:bold, :blue, "/msg #{bot.nick} !svn <comando>")])
-		when /remover/i
-			m.reply Format(:grey, "Sintaxe: %s\n" %
-				[Format(:bold, :blue, "!SVN REMOVER <ramo>")])
-			m.reply Format(:grey,
-				%Q{Este comando remove a cópia local do código-fonte no servidor. Deve
-					ser utilizado sempre que houver algum problema com a cópia local que não
-					possa ser solucionada através do comando %s.\n} % 
-						[Format(:bold, :blue, "REVERTER")])
+		m.reply Format(:grey, "Comando %s não suportado.\n" %
+				[Format(:bold, :blue, command)])
 		end
 	end
 end # class
