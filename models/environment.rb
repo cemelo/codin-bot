@@ -2,11 +2,15 @@
 require 'fileutils'
 require 'open3'
 require 'logger'
+
 require 'models/configuration'
+require 'models/errors'
 
 module CodinBot
 	class Environment
-		
+
+		attr_reader :config
+
 		def initialize(&block)
 			@config = Configuration::Environment.new
 			instance_eval &block if block_given?
@@ -14,14 +18,37 @@ module CodinBot
 
 		def configure(&block)
 			yield(@config) if block_given?
+
+			if @config.log_file
+				@logger = Logger.new @config.log_file, 'daily'
+				@logger.formatter = proc do |sev, datetime, progname, msg|
+					"#{sev} #{datetime} #{progname}:\n#{msg}"
+				end
+			end
+		end
+
+		def log
+			if not @logger
+				@logger = Logger.new STDOUT
+			end
+
+			@logger
+		end
+
+		def log?
+			not @logger.nil? and File.exists? log_file
+		end
+
+		def log_file
+			@config.log_file
 		end
 
 		#
 		# SVN Functions
 		#
 
-		def repo_dir
-			@config.repo_dir
+		def checked_out?
+			File.directory? @config.repo_dir
 		end
 
 		def revert(username, password)
@@ -33,8 +60,10 @@ module CodinBot
 
 			output, proc = Open3.capture2e(command)
 
+			log.info output
+
 			if output =~ /.*authorization failed.*/i
-				raise 'Authorization failed'
+				raise SVNAuthorizationError.new 'Authorization failed'
 			end
 
 			if output =~ /.*revision.*\s([0-9]+)\./i
@@ -42,7 +71,7 @@ module CodinBot
 			end
 
 			if proc.exitstatus != 0
-				raise 'Unknown error'
+				raise SVNError.new 'Revert error'
 			end
 
 			at_revision.to_s
@@ -61,25 +90,29 @@ module CodinBot
 			puts command
 			output, proc = Open3.capture2e(command)
 
+			log.info output
+
 			if output =~ /.*authorization failed.*/i
-				raise 'Authorization failed'
+				raise SVNAuthorizationError.new 'Authorization failed'
 			end
 
 			if (output =~ /.*revision.*\s([0-9]+)\./i)
 				at_revision = output.scan(/.*revision.*\s([0-9]+)\./i).last[0]
 			end
 
-			puts output
-
 			if proc.exitstatus != 0
-				raise 'Unknown error'
+				raise SVNError.new 'Checkout error'
 			end
 
 			at_revision.to_s
 		end
 
 		def remove
-			FileUtils.rm_r File.join('.', @config.repo_dir)
+			begin
+				FileUtils.rm_r File.join('.', @config.repo_dir)
+			rescue
+				raise SVNError.new 'Directory does not exist'
+			end
 		end
 
 		#
@@ -96,18 +129,20 @@ module CodinBot
 			output, proc = Open3.capture2e(@config.build_env, command,
 				{ :chdir => File.join(@config.repo_dir, @config.base_project) })
 
+			log.info output
+
 			if proc.exitstatus != 0
-				raise 'Build failed'
+				raise BuildError.new 'Build failed'
 			end
 
 			FileUtils.cp_r File.join(@config.repo_dir, @config.base_project,
 				'build', @config.package), @config.local_deploy_dir
 
 			@config.contexts.each do |k, c|
-				`unzip -q #{File.join(@config.local_deploy_dir, @config.package)} \
+				log.info `unzip -q #{File.join(@config.local_deploy_dir, @config.package)} \
 				-d /tmp/build-#{c[:context]}`
 
-				raise "Build failed" if $? != 0
+				raise BuildError.new "Build failed" if $? != 0
 
 				Dir.chdir "/tmp/build-#{c[:context]}" do
 					xml = File.read('META-INF/application.xml')
@@ -118,9 +153,9 @@ module CodinBot
 						file.puts xml
 					end
 
-					`zip -q -r ../#{c[:package]} . -i *`
+					log.info `zip -q -r ../#{c[:package]} . -i *`
 
-					raise "Build failed" if $? != 0
+					raise BuildError.new "Build failed" if $? != 0
 
 				end # Dir.chdir
 
@@ -131,24 +166,34 @@ module CodinBot
 			end # contexts.each
 		end
 
-		def deploy(username, password, *environment)
+		def deploy(username, password, *package)
 			exitstatus = -1
 
-			environment = environment[0] || @config
-
-			Open3.popen2e("smbclient #{environment.deploy_server} -U sof/#{username}%#{password}",
-				:chdir => environment.local_deploy_dir) do |i, o, w|
+			Open3.popen2e("smbclient #{@config.deploy_server} -U sof/#{username}%#{password}",
+				:chdir => @config.local_deploy_dir) do |i, oe, w|
 				
-				i.puts "PUT #{environment.package} #{environment.remote_deploy_dir}\\#{environment.package}"
-				environment.contexts.each do |k, c|
-					i.puts "PUT #{c[:package]}\\#{c[:remote_deploy_dir]}\\#{c[:package]}"
+				if package.length > 0
+					i.puts "PUT #{package[0]} #{@config.remote_deploy_dir}\\#{package[0]}"
+				else
+					i.puts "PUT #{@config.package} #{@config.remote_deploy_dir}\\#{@config.package}"
+					@config.contexts.each do |k, c|
+						i.puts "PUT #{c[:package]}\\#{c[:remote_deploy_dir]}\\#{c[:package]}"
+					end
 				end
+
 				i.close
+
+				output = ""
+				oe.each do |line|
+					output << line
+				end
+
+				log.info output
 
 				exitstatus = w.value
 			end
 
-			raise 'Deploy failed' if exitstatus != 0
+			raise DeployError.new 'Deploy failed' if exitstatus != 0
 		end
 	end # class
 end # module

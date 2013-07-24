@@ -15,6 +15,8 @@ module CodinBot
 			attr_accessor :deploy_server
 			attr_accessor :remote_deploy_dir
 			attr_accessor :local_deploy_dir
+
+			attr_accessor :log_file
 		end
 	end
 end

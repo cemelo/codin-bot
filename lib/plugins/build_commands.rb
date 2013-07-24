@@ -1,32 +1,123 @@
 require 'cinch'
-require_relative '../build'
+
+require 'models/errors'
 
 class CodinBot::BuildCommands
 	include Cinch::Plugin
-	include CodinBot::Build
 	
 	match /build ajuda$/i, :method => :help
 	match /build ajuda (.+)$/i, :method => :help_command
 
-	match /build compilar$/i, :method => :compile
-	match /build compilar ([[:graph:]]+)$/i, :method => :compile
-	match /build compilar ([[:graph:]]+) \"(.+)\"$/i, :method => :compile
+	match /build compilar$/i, :method => :build
+	match /build compilar ([[:graph:]]+)$/i, :method => :build
+	match /build compilar ([[:graph:]]+) \"(.+)\"$/i, :method => :build
 
 	match /build implantar$/i, :method => :deploy
+	match /build implantar ([[:graph:]]+)$/i, :method => :deploy
+	match /build implantar ([[:graph:]]+) \"(.+)\"$/i, :method => :deploy
+	match /build implantar ([[:graph:]]+) em ([[:graph:]]+) \"(.+)\"$/i, :method => :deploy
 
-	def build(m, target, password)
+	def build(m, *args)
 		return m.reply Format(:grey, "Sintaxe: %s" %
-			Format(:bold, "!svn compilar <ambiente>")) if not match
+			Format(:bold, "!build compilar <ambiente> \"<senha>\"")) if args.length < 2
+
+		target = args[0]
+		password = args[1]
+
+		revision = 0
 
 		begin
-			target.strip!
-			Remove(config[target.to_sym][:dir])
+			if config[target.to_sym].checked_out?
+				m.reply Format(:grey, "Revertendo alterações no código-fonte.")
+				revision = config[target.to_sym].revert(m.user.nick, password)
+			else
+				m.reply Format(:grey, "Criando cópia local do código-fonte.")
+				revision = config[target.to_sym].checkout(m.user.nick, password, "'HEAD'")
+			end
 			
-			m.reply Format(:grey, "Diretório do ramo %s removido." %
+			m.reply Format(:grey, "Compilando revisao %s do ambiente %s." %
+				[Format(:bold, :blue, revision), Format(:bold, :blue, target)])
+
+			config[target.to_sym].build
+
+			m.reply Format(:grey, "Ambiente %s compilado com sucesso." %
 				Format(:bold, :blue, target))
-		rescue
+		rescue CodinBot::SVNError => s
 			m.reply Format(:grey,
-				"%s: diretório do ramo %s não existe." %
+				"%s: falha ao atualizar o código do ambiente %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)])
+		rescue CodinBot::BuildError => b
+			m.reply Format(:grey,
+				"%s: falha ao compilar código do ambiente %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)])
+		end
+	end
+
+	def deploy(m, *args)
+		return m.reply Format(:grey, "Sintaxe: %s" %
+			Format(:bold, "!build implantar <ambiente> [em <ambiente>] \"<senha>\"")) if args.length < 2
+
+		target = args[0]
+
+		if args.length == 2
+			password = args[1]
+			deploy_env = target
+		elsif args.length == 3
+			password = args[1]
+			deploy_env = args[1]
+		end
+
+		begin
+			revision = 0
+
+			if config[target.to_sym].checked_out?
+				m.reply Format(:grey, "Revertendo alterações no código-fonte.")
+				revision = config[target.to_sym].revert(m.user.nick, password)
+			else
+				m.reply Format(:grey, "Criando cópia local do código-fonte.")
+				revision = config[target.to_sym].checkout(m.user.nick, password, "'HEAD'")
+			end
+			
+			m.reply Format(:grey, "Compilando revisao %s do ambiente %s." %
+				[Format(:bold, :blue, revision), Format(:bold, :blue, target)])
+
+			config[target.to_sym].build
+
+			if target != deploy_env
+				m.reply Format(:grey, "Implantando pacotes do ambiente %s no ambiente %s." %
+					Format(:bold, :blue, target), Format(:bold, :blue, deploy_env))
+			else
+				m.reply Format(:grey, "Implantando pacotes do ambiente %s." %
+					Format(:bold, :blue, target))
+			end
+
+			if (args.length == 2)
+				config[target.to_sym].deploy(m.user.nick, password)
+			else
+				config[deploy_env.to_sym].deploy(m.user.nick, password,
+					config[target.to_sym].config.package)
+			end
+
+			if target != deploy_env
+				m.reply Format(:grey,
+					"Pacotes do ambiente %s implantados com sucesso no ambiente %s." %
+					Format(:bold, :blue, target), Format(:bold, :blue, deploy_env))
+			else
+				m.reply Format(:grey, "Pacotes do ambiente %s implantados com sucesso." %
+					Format(:bold, :blue, target))
+			end
+			
+		rescue CodinBot::SVNError => s
+			m.reply Format(:grey,
+				"%s: falha ao atualizar o código do ambiente %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)])
+		rescue CodinBot::BuildError => b
+			m.reply Format(:grey,
+				"%s: falha ao compilar código do ambiente %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)])
+		rescue CodinBot::DeployError => d
+			m.reply Format(:grey,
+				"%s: falha ao implantar pacotes do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)])
 		end
 	end
@@ -57,9 +148,9 @@ class CodinBot::BuildCommands
 			m.reply Format(:grey, "Sintaxe: %s\n" % [Format(:bold, :blue, "!BUILD LISTA")])
 			m.reply Format(:grey,
 				%Q{Este comando exibe uma lista com os ambientes disponíveis.})
-		when /obter/i
+		when /compilar/i
 			m.reply Format(:grey, "Sintaxe: %s\n" %
-				[Format(:bold, :blue, "!BUILD COMPILAR <ambiente> <senha>")])
+				[Format(:bold, :blue, "!BUILD COMPILAR <ambiente> \"<senha>\"")])
 			m.reply Format(:grey,
 				%Q{Este comando compila a última versão do código-fonte disponível no
 					repositório. Sempre que este comando é chamado, o código é atualizado
@@ -71,7 +162,7 @@ class CodinBot::BuildCommands
 					Format(:bold, "Atenção"),
 					Format(:bold, :blue, bot.nick),
 					Format(:bold, :blue, "/msg #{bot.nick} !build <comando>")])
-		when /reverter/i
+		when /implantar/i
 			m.reply Format(:grey, "Sintaxe: %s\n" %
 				[Format(:bold, :blue, "!BUILD IMPLANTAR <ambiente> [em <ambiente>] \"<senha>\"")])
 			m.reply Format(:grey,
@@ -86,8 +177,9 @@ class CodinBot::BuildCommands
 					Para isso, digite %s.\n} % [
 					Format(:bold, "Atenção"),
 					Format(:bold, :blue, bot.nick),
-					Format(:bold, :blue, "/msg #{bot.nick} !svn <comando>")])
-		m.reply Format(:grey, "Comando %s não suportado.\n" %
+					Format(:bold, :blue, "/msg #{bot.nick} !build <comando>")])
+		else
+			m.reply Format(:grey, "Comando %s não suportado.\n" %
 				[Format(:bold, :blue, command)])
 		end
 	end

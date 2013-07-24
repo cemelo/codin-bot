@@ -10,7 +10,7 @@ integracao = CodinBot::Environment.new do
 		config.base_project = 'SiopEAR'
 		config.package = 'SiopEAR.ear'
 		config.deploy_server = '\\\\\\\\10.209.64.48\\\\siop'
-		config.remote_deploy_dir = 'deploy\\Testes_integracao\\siop'
+		config.remote_deploy_dir = 'Deploy\\Testes_integracao\\siop'
 		config.local_deploy_dir = 'build'
 
 		config.contexts = {
@@ -27,8 +27,10 @@ integracao = CodinBot::Environment.new do
 		}
 
 		config.build_env = {
-			'JBOSS_HOME' => '/Users/carlos/Documents/apps/jboss-4.2.3.GA'
+			'JBOSS_HOME' => '/Users/carlos/Documents/dev/apps/jboss-4.2.3.GA'
 		}
+
+		config.log_file = 'log/integracao.log'
 	end
 end
 
@@ -39,17 +41,29 @@ configatron.options.dir = 'pid'
 configatron.server.addr = '10.209.67.21'
 configatron.server.port = 6667
 configatron.server.nick = 'Marmota'
-configatron.server.messages_per_second = 30
+configatron.server.messages_per_second = 50
 configatron.server.channels = ['#testchan']
 
 #
 # Plugins Configurations
 #
 
-configatron.plugins.plugins = [CodinBot::SVNCommands]
+configatron.plugins.plugins = [
+	CodinBot::CommonCommands,
+	CodinBot::SVNCommands,
+	CodinBot::BuildCommands
+]
 configatron.plugins.options = {}
 	
 # SVN Branches
 configatron.plugins.options[CodinBot::SVNCommands] = {
 	:trunk => integracao
+}
+
+configatron.plugins.options[CodinBot::BuildCommands] = {
+	:integracao => integracao
+}
+
+configatron.plugins.options[CodinBot::CommonCommands] = {
+	:integracao => integracao
 }

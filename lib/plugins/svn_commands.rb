@@ -1,5 +1,7 @@
 require 'cinch'
 
+require 'models/errors'
+
 class CodinBot::SVNCommands
 	include Cinch::Plugin
 	
@@ -71,16 +73,15 @@ class CodinBot::SVNCommands
 				"Cópia local do ramo %s revertida para a revisão %s." %	[
 					Format(:bold, :blue, branch),
 					Format(:bold, :blue, @revision.to_s)])
-		rescue Exception => e
-			if e.message == 'Authorization failed'
-				m.reply Format(:grey,
-					"%s: acesso negado ao ramo %s. Verifique seu nome de usuário e senha." %
-					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
-			else
-				m.reply Format(:grey,
-					"%s: cópia local do ramo %s não existe." %
-					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
-			end
+		
+		rescue CodinBot::SVNAuthorizationError => e
+			m.reply Format(:grey,
+				"%s: acesso negado ao ramo %s. Verifique seu nome de usuário e senha." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+		rescue CodinBot::SVNError => e
+			m.reply Format(:grey,
+				"%s: cópia local do ramo %s não existe." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
 		end
 	end
 
@@ -97,7 +98,7 @@ class CodinBot::SVNCommands
 		return m.reply Format(:grey, "Ramo não %s existe." %
 			Format(:bold, :blue, branch)) if config[branch.to_sym].nil?
 		
-		if File.directory? config[branch.to_sym].repo_dir
+		if config[branch.to_sym].checked_out?
 			m.reply Format(:grey, "Atualizando cópia local do ramo %s." %
 				Format(:bold, :blue, branch))
 		else
@@ -113,17 +114,14 @@ class CodinBot::SVNCommands
 				"Criada cópia local da revisão %s do ramo %s." %	[
 					Format(:bold, :blue, @revision.to_s),
 					Format(:bold, :blue, branch)])
-		rescue Exception => e
-			puts e.message
-			if e.message == 'Authorization failed'
-				m.reply Format(:grey,
-					"%s: acesso negado ao ramo %s. Verifique seu nome de usuário e senha." %
-					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
-			else
-				m.reply Format(:grey,
-					"%s: não foi possível criar cópia local do ramo %s." %
-					[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
-			end
+		rescue CodinBot::SVNAuthorizationError => e
+			m.reply Format(:grey,
+				"%s: acesso negado ao ramo %s. Verifique seu nome de usuário e senha." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
+		rescue CodinBot::SVNError => e
+			m.reply Format(:grey,
+				"%s: não foi possível criar cópia local do ramo %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)])
 		end
 	end
 
