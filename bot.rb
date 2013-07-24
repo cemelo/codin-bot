@@ -4,6 +4,21 @@ require 'lib/plugins'
 
 require 'config'
 
+# def Format(*args)
+#   lines = args.last
+#   args.pop
+
+#   @message = ''
+  
+#   lines.split("\n").each do |line|
+#     args.push line.strip
+#     @message << Cinch::Formatting.format(*args) << "\n"
+#     args.pop
+#   end
+
+#   @message.strip!
+# end
+
 bot = Cinch::Bot.new do
   configure do |config|
     config.server = configatron.server.addr
@@ -18,6 +33,13 @@ bot = Cinch::Bot.new do
 
   trap "SIGINT" do
     bot.quit
+  end
+
+  on :join do |m|
+    m.reply Format(:grey,
+      "Olá %s! Para conhecer os comandos suportados, digite %s." %
+      [Format(:bold, :blue, m.user.nick),
+        Format(:bold, :blue, "!ajuda")]) if m.user.nick != bot.nick
   end
 end
 

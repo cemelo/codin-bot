@@ -72,7 +72,7 @@ class CodinBot::CommonCommands
 		m.reply "    " << Format(:grey,
 			"BUILD      Fornece comandos de compilação e implantação")
 		m.reply "    " << Format(:grey,
-			"TAIL        Exibe as últimas linhas do log")
+			"TAIL       Exibe as últimas linhas do log")
 		m.reply "    " << Format(:grey,
 			"LOG        Baixa o arquivo de log")
 	end

@@ -5,10 +5,12 @@ module Cinch::Helpers
 
 		@message = ''
 		
-		lines.split("\n").each do |line|
-			args.push line.strip
-			@message << Cinch::Formatting.format(*args) << "\n"
-			args.pop
+		if not lines.nil?
+			lines.split("\n").each do |line|
+				args.push line.strip
+				@message << Cinch::Formatting.format(*args) << "\n"
+				args.pop
+			end
 		end
 
 		@message.strip!
