@@ -1,13 +1,15 @@
 
 $LOAD_PATH.unshift(File.expand_path(__dir__))
 
-desc "Test"
-task :test => [] do
-	require 'test/unit'
-	require 'test/tc_environment'
-end
+require "bundler/gem_tasks"
 
-desc "Run"
+# desc "Test"
+# task :test => [] do
+# 	require 'test/unit'
+# 	require 'test/tc_environment'
+# end
+
+desc "Run the bot"
 task :default => [] do
 	require 'bot'
 end

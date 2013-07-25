@@ -11,6 +11,8 @@ module CodinBot
 
 		attr_reader :config
 
+		attr_accessor :in_use_by
+
 		def initialize(&block)
 			@config = Configuration::Environment.new
 			instance_eval &block if block_given?

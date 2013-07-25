@@ -1,23 +1,13 @@
 
 require 'cinch'
-require 'lib/plugins'
+require 'cinch/plugins/fortune'
 
+require 'lib/plugins'
 require 'config'
 
-# def Format(*args)
-#   lines = args.last
-#   args.pop
-
-#   @message = ''
-  
-#   lines.split("\n").each do |line|
-#     args.push line.strip
-#     @message << Cinch::Formatting.format(*args) << "\n"
-#     args.pop
-#   end
-
-#   @message.strip!
-# end
+Cinch::Plugins::Fortune.configure do |c|
+  c.max_length = 100
+end
 
 bot = Cinch::Bot.new do
   configure do |config|
@@ -29,6 +19,8 @@ bot = Cinch::Bot.new do
 
     config.plugins.plugins = configatron.plugins.plugins
     config.plugins.options = configatron.plugins.options
+
+    config.plugins.plugins.push(Cinch::Plugins::Fortune)
   end  
 
   trap "SIGINT" do
