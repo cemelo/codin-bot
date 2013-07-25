@@ -2,3 +2,4 @@ build/
 repos/
 log/
 .DS_Store
+Gemfile.lock
