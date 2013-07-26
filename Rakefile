@@ -2,8 +2,6 @@
 $LOAD_PATH.unshift(File.expand_path(__dir__))
 $LOAD_PATH.unshift(File.join(File.expand_path(__dir__), 'lib'))
 
-require "bundler/gem_tasks"
-
 # desc "Test"
 # task :test => [] do
 # 	require 'test/unit'
