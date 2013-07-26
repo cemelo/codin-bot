@@ -67,5 +67,5 @@ open '.lock', 'w' do |io|
   io.write(Process.pid)
 end
 
-bot.loggers.level = :warn
+# bot.loggers.level = :warn
 bot.start
