@@ -1,6 +1,8 @@
 
 require 'configatron'
+
 require 'models/environment'
+require 'plugins'
 
 integracao = CodinBot::Environment.new do
 	configure do |config|
