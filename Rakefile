@@ -22,3 +22,7 @@ task :version => [] do
 	
 	puts CodinBot.version
 end
+
+task :update => [] do
+	require 'update_bot'
+end
