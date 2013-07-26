@@ -6,21 +6,58 @@ require 'models/errors'
 class CodinBot::CommonCommands
 	include Cinch::Plugin
 	
-	match /ajuda$/, :method => :help
+	match /ajuda$/i, :method => :help
 	
-	match /log$/i, :method => :send_log
-	match /log (.+)$/i, :method => :send_log
+	match /autenticar(?:[ ]\"(.*)\")?(?:[ ]\"(.*)\")?$/ix, :method => :auth
+	
+	match /desautenticar$/i, :method => :deauth
 
-	match /tail$/i, :method => :tail
-	match /tail (.+)$/i, :method => :tail
-	match /tail (.+) ([0-9]+)$/i, :method => :tail_n
+	match /lista$/i, :method => :list
+
+	match /log(?:[ ]([[:graph:]]+))?$/ix, :method => :send_log
+
+	match /tail(?:[ ]([[:graph:]]+))?
+		(?:[ ](\d+))?
+		(?:(?<![ ])$)/ix, :method => :tail
 	
-	def tail(m, *target)
+	def auth(m, password, svn_password)
+		return m.reply Format(:grey, "Sintaxe: %s" %
+			Format(:bold, "!autenticar <senha> [<senha_svn>]")) \
+			if password.nil?
+
+		svn_password ||= password
+
+		shared[:auth][m.user.nick] = {
+			:password => password,
+			:svn_password => svn_password
+		}
+
+		m.reply Format(:grey, "Senha do usuário %s salva." %
+			Format(:bold, :blue, m.user.nick))
+	end
+
+	def deauth(m)
+		shared[:auth].delete(m.user.nick)
+
+		m.reply Format(:grey, "Senha do usuário %s removida." %
+			Format(:bold, :blue, m.user.nick))
+	end
+
+	def list(m)
+		m.reply Format(:grey, "Lista de ambientes disponíveis:")
+
+		shared[:environments].each_pair do |k, v|
+			m.reply "    " << Format(:grey, "- #{v.config.description} (#{k})")
+		end
+	end
+
+	def tail(m, target, num_lines)
 		return m.reply Format(:grey, "Sintaxe: %s" %
 			Format(:bold, "!tail <ambiente> [<num_linhas>]")) \
-			if target.nil? or target.length < 1
+			if target.nil?
 
-		tail_n(m, target[0], "10")
+		num_lines ||= "10"
+		tail_n(m, target, num_lines)
 	end
 
 	def tail_n(m, target, lines)
@@ -31,30 +68,29 @@ class CodinBot::CommonCommands
 
 		return m.reply Format(:grey,
 			%Q{Não há log de operações no ambiente %s.} %
-			Format(:bold, :blue, target)) if not config[target.to_sym].log?
+			Format(:bold, :blue, target)) if not shared[:environments][target.to_sym].log?
 
 		m.reply Format(:grey, "Últimas %s linhas do log do ambiente %s:" %
 			[Format(:bold, :blue, lines), Format(:bold, :blue, target)])
 
 		output, proc = 
-			Open3.capture2e("tail -n #{lines} #{config[target.to_sym].log_file}")
+			Open3.capture2e("tail -n #{lines} #{shared[:environments][target.to_sym].log_file}")
 
 		m.reply Format(:grey, output)
 	end
 
-	def send_log(m, *target)
+	def send_log(m, target)
 		return m.reply Format(:grey, "Sintaxe: %s" %
-			Format(:bold, "!log <ambiente>")) \
-			if target.nil? or target.length < 1
+			Format(:bold, "!log <ambiente>")) if target.nil?
 
 		return m.reply Format(:grey,
-			%Q{Não há log de operações no ambiente %s.} %
-			Format(:bold, :blue, target[0])) if not config[target[0] .to_sym].log?
+			%Q{Não há log de operações no ambiente %s.} %	Format(:bold, :blue, target)) \
+				unless shared[:environments][target.to_sym].log?
 
 		m.reply Format(:grey, "Enviando arquivo de log do ambiente %s." %
-			Format(:bold, :blue, target[0]))
+			Format(:bold, :blue, target))
 
-		m.user.dcc_send(open(config[target[0].to_sym].log_file))
+		m.user.dcc_send(open(shared[:environments][target.to_sym].log_file))
 	end
 
 	def help(m)
@@ -66,14 +102,20 @@ class CodinBot::CommonCommands
 		
 		m.reply " "
 		m.reply "    " << Format(:grey,
-			"AJUDA      Mostra esta mensagem de ajuda")
+			"AJUDA          Mostra esta mensagem de ajuda")
 		m.reply "    " << Format(:grey,
-			"SVN        Fornece comandos de controle da cópia do código-fonte")
+			"AUTENTICAR     Autentica o usuário para operações com senha")
 		m.reply "    " << Format(:grey,
-			"BUILD      Fornece comandos de compilação e implantação")
+			"DESAUTENTICAR  Remove a sessão do usuário")
 		m.reply "    " << Format(:grey,
-			"TAIL       Exibe as últimas linhas do log")
+			"LISTA          Exibe uma lista com os ambientes disponíveis")
 		m.reply "    " << Format(:grey,
-			"LOG        Baixa o arquivo de log")
+			"SVN            Fornece comandos de controle da cópia do código-fonte")
+		m.reply "    " << Format(:grey,
+			"BUILD          Fornece comandos de compilação e implantação")
+		m.reply "    " << Format(:grey,
+			"TAIL           Exibe as últimas linhas do log")
+		m.reply "    " << Format(:grey,
+			"LOG            Baixa o arquivo de log")
 	end
 end # class

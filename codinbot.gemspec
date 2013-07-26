@@ -14,5 +14,5 @@ Gem::Specification.new do |s|
   s.require_paths = [".", "lib"]
 
   s.add_dependency "cinch"
-  s.add_dependency "cinch-fortune"
+  s.add_dependency "fortune_gem"
 end

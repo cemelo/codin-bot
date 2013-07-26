@@ -7,7 +7,7 @@ module CodinBot
     match "fortune"
 
     def execute(m)
-      m.reply Format(:grey, [m.user.nick, fortune].join(":\n"))
+      m.reply [m.user.nick, fortune].join(":\n")
     end
 
     private

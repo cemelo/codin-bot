@@ -2,6 +2,8 @@
 require 'fileutils'
 require 'open3'
 require 'logger'
+require 'date'
+require 'thread'
 
 require 'models/configuration'
 require 'models/errors'
@@ -11,10 +13,13 @@ module CodinBot
 
 		attr_reader :config
 
-		attr_accessor :in_use_by
+		attr_accessor :monitoring_thread
 
 		def initialize(&block)
 			@config = Configuration::Environment.new
+			@lock = Mutex.new
+			@locking_user = nil
+
 			instance_eval &block if block_given?
 		end
 
@@ -27,6 +32,33 @@ module CodinBot
 					"#{sev} #{datetime} #{progname}:\n#{msg}"
 				end
 			end
+		end
+
+		def locking_user
+			@locking_user
+		end
+
+		def lock(user)
+			result = false
+
+			@lock.synchronize do
+				if @locking_user.nil?
+					@locking_user = user
+					result = true
+				else
+					result = false
+				end
+			end
+
+			result
+		end
+
+		def unlock
+			@lock.synchronize do
+				@locking_user = nil
+			end
+
+			@locking_user.nil?
 		end
 
 		def log
@@ -89,7 +121,6 @@ module CodinBot
 				"--revision #{revision} " <<
 				"#{@config.repo_url} #{@config.repo_dir}"
 
-			puts command
 			output, proc = Open3.capture2e(command)
 
 			log.info output
@@ -117,6 +148,35 @@ module CodinBot
 			end
 		end
 
+		def last_log(username, password)
+			output = `svn log -l 1 --username #{username} \
+				--password #{password} #{@config.repo_url}`
+
+			if $? != 0
+				if output =~ /.*authorization failed.*/i
+					raise SVNAuthorizationError.new 'Authorization failed'
+				else
+					raise SVNError.new 'Log error'
+				end
+			end
+
+			matches = /
+						^-{72}\n 									# First line
+						r([0-9]+) [ ] \| 					# Revision
+						[ ] ([[:graph:]]+) [ ] \|	# Author
+						[ ] (.+) [ ]  \|					# DateTime
+						[ ] [0-9]+ [ ]line[s]?		# Message line count
+						\n\n(.*)\n 								# Commit Message
+						-{72}$/xm.match(output)
+
+			revision = matches[1].to_i
+			author   = matches[2]
+			datetime = DateTime.parse(matches[3])
+			message  = matches[4]
+
+			return revision, author, datetime, message
+		end
+
 		#
 		# Build & Deploy
 		#
@@ -141,7 +201,7 @@ module CodinBot
 				'build', @config.package), @config.local_deploy_dir
 
 			@config.contexts.each do |k, c|
-				log.info `unzip -q #{File.join(@config.local_deploy_dir, @config.package)} \
+				log.info `unzip -o -q #{File.join(@config.local_deploy_dir, @config.package)} \
 				-d /tmp/build-#{c[:context]}`
 
 				raise BuildError.new "Build failed" if $? != 0

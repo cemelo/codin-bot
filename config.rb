@@ -5,6 +5,8 @@ require 'models/environment'
 integracao = CodinBot::Environment.new do
 	configure do |config|
 		config.description = 'Ambiente de Integração'
+		config.svn_branch = 'trunk'
+
 		config.repo_url = 'http://10.209.64.205/getec/SIOP/trunk/04_Implementacao'
 		config.repo_dir = 'repos/trunk'
 		config.base_project = 'SiopEAR'
@@ -45,25 +47,34 @@ configatron.server.messages_per_second = 50
 configatron.server.channels = ['#testchan']
 
 #
+# Environment Configurations
+#
+
+configatron.shared = {
+	:environments => {
+		:integracao => integracao
+	},
+
+	:auth => {}
+}
+
+#
 # Plugins Configurations
 #
 
 configatron.plugins.plugins = [
 	CodinBot::CommonCommands,
 	CodinBot::SVNCommands,
-	CodinBot::BuildCommands
+	CodinBot::BuildCommands,
+	CodinBot::Fortune
 ]
 configatron.plugins.options = {}
 	
 # SVN Branches
 configatron.plugins.options[CodinBot::SVNCommands] = {
-	:trunk => integracao
+	:monitor_sleep_interval => 5
 }
 
-configatron.plugins.options[CodinBot::BuildCommands] = {
-	:integracao => integracao
-}
-
-configatron.plugins.options[CodinBot::CommonCommands] = {
-	:integracao => integracao
+configatron.plugins.options[CodinBot::SVNCommands] = {
+	:command => "fortune"
 }

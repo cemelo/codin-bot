@@ -21,4 +21,5 @@ module CodinBot
 	require 'lib/plugins/common_commands'
 	require 'lib/plugins/svn_commands'
 	require 'lib/plugins/build_commands'
+	require 'lib/plugins/fortune'
 end

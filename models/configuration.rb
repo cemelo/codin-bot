@@ -3,6 +3,7 @@ module CodinBot
 	module Configuration
 		class Environment
 			attr_accessor :description
+			attr_accessor :svn_branch
 
 			attr_accessor :repo_url
 			attr_accessor :repo_dir
@@ -17,6 +18,7 @@ module CodinBot
 			attr_accessor :local_deploy_dir
 
 			attr_accessor :log_file
+			attr_accessor :sleep_interval
 		end
 	end
 end
