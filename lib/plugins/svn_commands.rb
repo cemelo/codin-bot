@@ -37,15 +37,15 @@ class CodinBot::SVNCommands
 		return m.reply Format(:grey, "Sintaxe: %s" %
 			Format(:bold, "!svn remover <ambiente>")) if branch.nil?
 
-		return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
-			Format(:bold, :red, "ERRO"),
-			Format(:bold, :blue, shared[:environments][branch.to_sym].locking_user)
-		]) unless lock_env m.user.nick, branch
-
 		return m.reply Format(:grey, "Ambiente não %s existe." %
 			Format(:bold, :blue, branch)) if shared[:environments][branch.to_sym].nil?
 
 		begin
+			return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
+				Format(:bold, :red, "ERRO"),
+				Format(:bold, :blue, shared[:environments][branch.to_sym].locking_user)
+			]) unless lock_env m.user.nick, branch
+
 			shared[:environments][branch.to_sym].remove
 			
 			m.reply Format(:grey, "Cópia local do ambiente %s removida." %
@@ -63,11 +63,6 @@ class CodinBot::SVNCommands
 		return m.reply Format(:grey, "Sintaxe: %s" %
 			Format(:bold, "!svn reverter <ambiente>")) if branch.nil?
 
-		return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
-			Format(:bold, :red, "ERRO"),
-			Format(:bold, :blue, shared[:environments][branch.to_sym].locking_user)
-		]) unless lock_env m.user.nick, branch
-
 		unless shared[:auth][m.user.nick]
 			return m.reply Format(:grey,
 				"Este comando exige autenticação. Para autenticar-se,\ndigite %s" %
@@ -79,10 +74,15 @@ class CodinBot::SVNCommands
 		return m.reply Format(:grey, "Ambiente não %s existe." %
 			Format(:bold, :blue, branch)) if shared[:environments][branch.to_sym].nil?
 
-		m.reply Format(:grey, "Revertendo alterações no ambiente %s." %
-			Format(:bold, :blue, branch))
-
 		begin
+			return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
+				Format(:bold, :red, "ERRO"),
+				Format(:bold, :blue, shared[:environments][branch.to_sym].locking_user)
+			]) unless lock_env m.user.nick, branch
+
+			m.reply Format(:grey, "Revertendo alterações no ambiente %s." %
+				Format(:bold, :blue, branch))
+
 			@revision = shared[:environments][branch.to_sym].revert(m.user.nick, password)
 
 			m.reply Format(:grey,
@@ -112,11 +112,6 @@ class CodinBot::SVNCommands
 		return m.reply Format(:grey, "Sintaxe: %s" %
 			Format(:bold, "!svn obter <ambiente> [<revisão>]")) if branch.nil?
 
-		return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
-			Format(:bold, :red, "ERRO"),
-			Format(:bold, :blue, shared[:environments][branch.to_sym].locking_user)
-		]) unless lock_env m.user.nick, branch
-
 		unless shared[:auth][m.user.nick]
 			return m.reply Format(:grey,
 				"Este comando exige autenticação. Para autenticar-se,\ndigite %s" %
@@ -127,16 +122,21 @@ class CodinBot::SVNCommands
 
 		return m.reply Format(:grey, "Ambiente %s não existe." %
 			Format(:bold, :blue, branch)) if shared[:environments][branch.to_sym].nil?
-		
-		if shared[:environments][branch.to_sym].checked_out?
-			m.reply Format(:grey, "Atualizando cópia local do ambiente %s." %
-				Format(:bold, :blue, branch))
-		else
-			m.reply Format(:grey, "Criando cópia local do ambiente %s. Aguarde..." %
-				Format(:bold, :blue, branch))
-		end
 
 		begin
+			return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
+				Format(:bold, :red, "ERRO"),
+				Format(:bold, :blue, shared[:environments][branch.to_sym].locking_user)
+			]) unless lock_env m.user.nick, branch
+
+			if shared[:environments][branch.to_sym].checked_out?
+				m.reply Format(:grey, "Atualizando cópia local do ambiente %s." %
+					Format(:bold, :blue, branch))
+			else
+				m.reply Format(:grey, "Criando cópia local do ambiente %s. Aguarde..." %
+					Format(:bold, :blue, branch))
+			end
+
 			@revision = shared[:environments][branch.to_sym].checkout(m.user.nick, password,
 				revision)
 

@@ -29,11 +29,6 @@ class CodinBot::BuildCommands
 		return m.reply Format(:grey, "Sintaxe: %s" %
 			Format(:bold, "!build compilar <ambiente>")) if target.nil?
 
-		return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
-			Format(:bold, :red, "ERRO"),
-			Format(:bold, :blue, shared[:environments][target.to_sym].locking_user)
-		]) unless lock_env m.user.nick, target
-
 		if not shared[:auth][m.user.nick]
 			return m.reply Format(:grey,
 				"Este comando exige autenticação. Para autenticar-se,\ndigite %s" %
@@ -47,6 +42,11 @@ class CodinBot::BuildCommands
 		revision = 0
 
 		begin
+			return m.reply Format(:grey, "%s! Ambiente em uso por %s." % [
+				Format(:bold, :red, "ERRO"),
+				Format(:bold, :blue, shared[:environments][target.to_sym].locking_user)
+			]) unless lock_env m.user.nick, target
+
 			if shared[:environments][target.to_sym].checked_out?
 				m.reply Format(:grey, "Revertendo alterações no código-fonte.")
 				revision = shared[:environments][target.to_sym].revert(m.user.nick, password)
@@ -84,11 +84,6 @@ class CodinBot::BuildCommands
 			Format(:bold, "!build implantar <ambiente> [em <ambiente>]")) \
 			if target.nil?
 
-		return m.reply Format(:grey, "%s: Ambiente em uso por %s." % [
-			Format(:bold, :red, "ERRO"),
-			Format(:bold, :blue, shared[:environments][target.to_sym].locking_user)
-		]) unless lock_env m.user.nick, target
-
 		if not shared[:auth][m.user.nick]
 			return m.reply Format(:grey,
 				"Este comando exige autenticação. Para autenticar-se,\ndigite %s" %
@@ -103,6 +98,11 @@ class CodinBot::BuildCommands
 
 		begin
 			revision = 0
+
+			return m.reply Format(:grey, "%s: Ambiente em uso por %s." % [
+				Format(:bold, :red, "ERRO"),
+				Format(:bold, :blue, shared[:environments][target.to_sym].locking_user)
+			]) unless lock_env m.user.nick, target
 
 			if shared[:environments][target.to_sym].checked_out?
 				m.reply Format(:grey, "Revertendo alterações no código-fonte.")

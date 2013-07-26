@@ -4,7 +4,7 @@ module CodinBot
   class Fortune
     include Cinch::Plugin
 
-    match "fortune"
+    match /fortune/i
 
     def execute(m)
       m.reply [m.user.nick, fortune].join(":\n")
