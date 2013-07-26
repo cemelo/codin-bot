@@ -56,6 +56,7 @@ class CodinBot::CommonCommands
 			Format(:bold, "!tail <ambiente> [<num_linhas>]")) \
 			if target.nil?
 
+		num_lines = "30" if num_lines.to_i > 30
 		num_lines ||= "10"
 		tail_n(m, target, num_lines)
 	end
