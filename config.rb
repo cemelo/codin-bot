@@ -46,7 +46,7 @@ configatron.server.addr = '10.209.67.21'
 configatron.server.port = 6667
 configatron.server.nick = 'Marmota'
 configatron.server.messages_per_second = 50
-configatron.server.channels = ['#testchan']
+configatron.server.channels = ['#codin']
 
 #
 # Environment Configurations
