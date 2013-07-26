@@ -92,12 +92,16 @@ class CodinBot::SVNCommands
 		
 		rescue CodinBot::SVNAuthorizationError => e
 			m.reply Format(:grey,
-				"%s! acesso negado ao ambiente %s. Verifique seu nome de usuário e senha." %
+				"%s! Acesso negado ao ambiente %s. Verifique seu nome de usuário e senha." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue,
 					shared[:environments][branch.to_sym].config.svn_branch)]), true
 		rescue CodinBot::SVNError => e
 			m.reply Format(:grey,
-				"%s! cópia local do ambiente %s não existe." %
+				"%s! Cópia local do ambiente %s não existe." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)]), true
+		rescue
+			m.reply Format(:grey,
+				"%s! Falha desconhecida." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)]), true
 		end
 
@@ -142,11 +146,15 @@ class CodinBot::SVNCommands
 					Format(:bold, :blue, branch)]), true
 		rescue CodinBot::SVNAuthorizationError => e
 			m.reply Format(:grey,
-				"%s! acesso negado ao ambiente %s. Verifique seu nome de usuário e senha." %
+				"%s! Acesso negado ao ambiente %s. Verifique seu nome de usuário e senha." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)]), true
 		rescue CodinBot::SVNError => e
 			m.reply Format(:grey,
-				"%s! não foi possível criar cópia local do ambiente %s." %
+				"%s! Não foi possível criar cópia local do ambiente %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)]), true
+		rescue
+			m.reply Format(:grey,
+				"%s! Falha desconhecida." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, branch)]), true
 		end
 
@@ -168,12 +176,12 @@ class CodinBot::SVNCommands
 
 		if shared[:environments][branch.to_sym].monitoring_thread
 			return m.reply Format(:grey,
-				"%s: O ambiente %s já está sendo monitorado." %
+				"%s! O ambiente %s já está sendo monitorado." %
 					[Format(:bold, :red, "ERRO"), Format(:bold, :red, branch)]
 				) if /^iniciar$/i.match action
 		else
 			return m.reply Format(:grey,
-				"%s: O ambiente %s não está sendo monitorado." %
+				"%s! O ambiente %s não está sendo monitorado." %
 					[Format(:bold, :red, "ERRO"), Format(:bold, :red, branch)]
 				) if /^parar$/i.match action
 		end

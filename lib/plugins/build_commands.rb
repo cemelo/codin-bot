@@ -64,11 +64,15 @@ class CodinBot::BuildCommands
 				Format(:bold, :blue, target)), true
 		rescue CodinBot::SVNError => s
 			m.reply Format(:grey,
-				"%s! falha ao atualizar o código do ambiente %s." %
+				"%s! Falha ao atualizar o código do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
 		rescue CodinBot::BuildError => b
 			m.reply Format(:grey,
-				"%s! falha ao compilar código do ambiente %s." %
+				"%s! Falha ao compilar código do ambiente %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
+		rescue
+			m.reply Format(:grey,
+				"%s! Falha ao compilar código do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
 		end
 
@@ -139,15 +143,19 @@ class CodinBot::BuildCommands
 			
 		rescue CodinBot::SVNError => s
 			m.reply Format(:grey,
-				"%s! falha ao atualizar o código do ambiente %s." %
+				"%s! Falha ao atualizar o código do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
 		rescue CodinBot::BuildError => b
 			m.reply Format(:grey,
-				"%s! falha ao compilar código do ambiente %s." %
+				"%s! Falha ao compilar código do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
 		rescue CodinBot::DeployError => d
 			m.reply Format(:grey,
-				"%s! falha ao implantar pacotes do ambiente %s." %
+				"%s! Falha ao implantar pacotes do ambiente %s." %
+				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
+		rescue
+			m.reply Format(:grey,
+				"%s! Falha ao implantar pacotes do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
 		end
 

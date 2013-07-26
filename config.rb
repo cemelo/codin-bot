@@ -31,7 +31,7 @@ integracao = CodinBot::Environment.new do
 		}
 
 		config.build_env = {
-			'JBOSS_HOME' => '/Users/carlos/Documents/dev/apps/jboss-4.2.3.GA'
+			'JBOSS_HOME' => '/opt/jboss-4.2.3.GA'
 		}
 
 		config.log_file = 'log/integracao.log'
