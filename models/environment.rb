@@ -188,13 +188,13 @@ module CodinBot
 				FileUtils.mkdir_p @config.local_deploy_dir
 			end
 
-			output, proc = Open3.capture2e(@config.build_env, command,
+			output, status = Open3.capture2e(@config.build_env, command,
 				{ :chdir => File.join(@config.repo_dir, @config.base_project) })
 
 			log.info output
 
-			if proc.exitstatus != 0
-				raise BuildError.new 'Build failed'
+			if status.exitstatus != 0
+				raise BuildError.new 'Build (ant) failed'
 			end
 
 			FileUtils.cp_r File.join(@config.repo_dir, @config.base_project,
@@ -204,7 +204,7 @@ module CodinBot
 				log.info `unzip -o -q #{File.join(@config.local_deploy_dir, @config.package)} \
 				-d /tmp/build-#{c[:context]}`
 
-				raise BuildError.new "Build failed" if $? != 0
+				raise BuildError.new "Build (zip) failed" if $? != 0
 
 				Dir.chdir "/tmp/build-#{c[:context]}" do
 					xml = File.read('META-INF/application.xml')
@@ -217,7 +217,7 @@ module CodinBot
 
 					log.info `zip -q -r ../#{c[:package]} . -i *`
 
-					raise BuildError.new "Build failed" if $? != 0
+					raise BuildError.new "Build (unzip) failed" if $? != 0
 
 				end # Dir.chdir
 
