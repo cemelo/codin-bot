@@ -67,6 +67,7 @@ class CodinBot::BuildCommands
 				"%s! Falha ao atualizar o código do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true
 		rescue CodinBot::BuildError => b
+			puts b.message
 			m.reply Format(:grey,
 				"%s! Falha ao compilar código do ambiente %s." %
 				[Format(:bold, :red, "ERRO"), Format(:bold, :blue, target)]), true

@@ -191,6 +191,7 @@ module CodinBot
 			output, status = Open3.capture2e(@config.build_env, command,
 				{ :chdir => File.join(@config.repo_dir, @config.base_project) })
 
+			puts output
 			log.info output
 
 			if status.exitstatus != 0
